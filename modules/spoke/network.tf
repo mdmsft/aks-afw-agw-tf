@@ -1,5 +1,5 @@
 resource "azurerm_virtual_network" "main" {
-  name                = "vnet-${local.resource_suffix}"
+  name                = "vnet-${var.resource_suffix}"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   address_space       = [var.address_space]
@@ -13,7 +13,7 @@ resource "azurerm_subnet" "cluster" {
 }
 
 resource "azurerm_network_security_group" "cluster" {
-  name                = "nsg-${local.resource_suffix}-aks"
+  name                = "nsg-${var.resource_suffix}-aks"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
 }
@@ -23,29 +23,26 @@ resource "azurerm_subnet_network_security_group_association" "cluster" {
   subnet_id                 = azurerm_subnet.cluster.id
 }
 
-resource "azurerm_public_ip_prefix" "cluster" {
-  name                = "ippre-${local.resource_suffix}-aks"
+resource "azurerm_route_table" "cluster" {
+  name                = "rt-${var.resource_suffix}"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  prefix_length       = var.nat_gateway_public_ip_prefix_length
-  sku                 = "Standard"
-  zones               = ["1", "2", "3"]
+
+  route {
+    name                   = "net-to-afw"
+    address_prefix         = "0.0.0.0/0"
+    next_hop_in_ip_address = var.firewall_private_ip_address
+    next_hop_type          = "VirtualAppliance"
+  }
+
+  route {
+    name           = "afw-to-www"
+    address_prefix = "${var.firewall_public_ip_address}/32"
+    next_hop_type  = "Internet"
+  }
 }
 
-resource "azurerm_nat_gateway" "cluster" {
-  name                    = "ng-${local.resource_suffix}-aks"
-  location                = azurerm_resource_group.main.location
-  resource_group_name     = azurerm_resource_group.main.name
-  idle_timeout_in_minutes = 4
-  sku_name                = "Standard"
-}
-
-resource "azurerm_nat_gateway_public_ip_prefix_association" "cluster" {
-  nat_gateway_id      = azurerm_nat_gateway.cluster.id
-  public_ip_prefix_id = azurerm_public_ip_prefix.cluster.id
-}
-
-resource "azurerm_subnet_nat_gateway_association" "cluster" {
-  nat_gateway_id = azurerm_nat_gateway.cluster.id
+resource "azurerm_subnet_route_table_association" "cluster" {
   subnet_id      = azurerm_subnet.cluster.id
+  route_table_id = azurerm_route_table.cluster.id
 }

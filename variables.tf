@@ -35,9 +35,19 @@ variable "client_secret" {
   sensitive = true
 }
 
-variable "address_space" {
+variable "hub_address_space" {
   type    = string
-  default = "192.168.255.0/24"
+  default = "192.168.0.0/24"
+}
+
+variable "spoke_address_space" {
+  type    = string
+  default = "192.168.1.0/24"
+}
+
+variable "product_address_space" {
+  type    = string
+  default = "192.168.2.0/24"
 }
 
 variable "kubernetes_cluster_orchestrator_version" {
@@ -256,4 +266,14 @@ variable "container_registry_sku" {
 variable "nat_gateway_public_ip_prefix_length" {
   type    = number
   default = 28
+}
+
+variable "application_gateway_min_capacity" {
+  type    = number
+  default = 1
+}
+
+variable "application_gateway_max_capacity" {
+  type    = number
+  default = 3
 }

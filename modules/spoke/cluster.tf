@@ -4,11 +4,16 @@ locals {
   kubernetes_cluster_workload_node_pool_orchestrator_version = var.kubernetes_cluster_workload_node_pool_orchestrator_version == null ? local.kubernetes_cluster_orchestrator_version : var.kubernetes_cluster_workload_node_pool_orchestrator_version
 }
 
+data "azurerm_kubernetes_service_versions" "main" {
+  location        = var.location
+  include_preview = false
+}
+
 resource "azurerm_kubernetes_cluster" "main" {
-  name                              = "aks-${local.context_name}"
+  name                              = "aks-${var.context_name}"
   location                          = azurerm_resource_group.main.location
   resource_group_name               = azurerm_resource_group.main.name
-  dns_prefix                        = local.context_name
+  dns_prefix                        = var.context_name
   automatic_channel_upgrade         = var.kubernetes_cluster_automatic_channel_upgrade
   role_based_access_control_enabled = true
   azure_policy_enabled              = var.kubernetes_cluster_azure_policy_enabled
@@ -16,7 +21,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   kubernetes_version                = local.kubernetes_cluster_orchestrator_version
   local_account_disabled            = true
   oidc_issuer_enabled               = var.kubernetes_cluster_oidc_issuer_enabled
-  node_resource_group               = "rg-${local.resource_suffix}-aks"
+  node_resource_group               = "rg-${var.resource_suffix}-aks"
   sku_tier                          = var.kubernetes_cluster_sku_tier
   workload_identity_enabled         = var.kubernetes_cluster_oidc_issuer_enabled && var.kubernetes_cluster_workload_identity_enabled
 
@@ -49,7 +54,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   }
 
   oms_agent {
-    log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+    log_analytics_workspace_id = var.log_analytics_workspace_id
   }
 
   network_profile {
@@ -59,7 +64,7 @@ resource "azurerm_kubernetes_cluster" "main" {
     docker_bridge_cidr = var.kubernetes_cluster_docker_bridge_cidr
     service_cidr       = var.kubernetes_cluster_service_cidr
     load_balancer_sku  = "standard"
-    outbound_type      = "userAssignedNATGateway"
+    outbound_type      = "userDefinedRouting"
   }
 
   dynamic "key_vault_secrets_provider" {
@@ -73,7 +78,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   dynamic "microsoft_defender" {
     for_each = var.kubernetes_cluster_microsoft_defender_enabled ? [{}] : []
     content {
-      log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+      log_analytics_workspace_id = var.log_analytics_workspace_id
     }
   }
 }
@@ -105,9 +110,9 @@ resource "azurerm_role_assignment" "cluster_network_contributor" {
   principal_id         = azurerm_kubernetes_cluster.main.identity.0.principal_id
 }
 
-resource "azurerm_role_assignment" "registry_pull" {
+resource "azurerm_role_assignment" "container_registry_pull" {
   role_definition_name = "AcrPull"
-  scope                = azurerm_container_registry.main.id
+  scope                = var.container_registry_id
   principal_id         = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
 }
 
